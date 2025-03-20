@@ -23,19 +23,30 @@ void process_instruction()
     uint64_t PC = CURRENT_STATE.PC;
     uint32_t instruction =  mem_read_32(PC);
 
-    //Para chequear que estamos leyendo
+    //Para chequear lo que estamos leyendo
     printf("Instruction: %x\n", instruction);
 
-    int adds_opcode = 0b10110001<<24;
-    int adds_mask = 0b11111111<<24;
+    int adds_extended_opcode = 0b10101011001<<24;
+    int adds_extended_mask = 0b11111111111<<24;
+    int adds_immediate_opcode = 0b10110001<<24;
+    int adds_immediate_mask = 0b11111111<<24;
 
-    printf("opcode: %x\n", adds_opcode);
+
+    printf("opcode: %x\n", adds_immediate_opcode);
 
     // printf("Mask: %n", instruction & adds_mask);
 
-    if ((instruction & adds_mask) == adds_opcode) {
-        printf("es un ADDS!!!!\n");
+    if ((instruction & adds_extended_mask) == adds_extended_opcode){
+        //imm12
+        int imm12_mask = 0b111111111111<<10;
+        int imm12 = (instruction & imm12_mask)>>10;
+        //Rn
+        int Rn_mask = 0b11111<<5>>20;
+    }
+
+    if ((instruction & adds_immediate_mask) == adds_immediate_opcode) {
+        printf("es un ADDS immediate!!!!\n");
     } else {
-        printf("no es un ADDS\n");
+        printf("no es un ADDS immediate\n");
     }
 }
