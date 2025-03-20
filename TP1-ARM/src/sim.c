@@ -20,6 +20,7 @@ void process_instruction()
     * values in NEXT_STATE. You can call mem_read_32() and mem_write_32() to
     * access memory. 
     * */
+
     uint64_t PC = CURRENT_STATE.PC;
     uint32_t instruction =  mem_read_32(PC);
 
@@ -28,6 +29,7 @@ void process_instruction()
 
     int adds_opcode = 0b10110001<<24;
     int adds_mask = 0b11111111<<24;
+    
 
     printf("opcode: %x\n", adds_opcode);
 
@@ -38,4 +40,6 @@ void process_instruction()
     } else {
         printf("no es un ADDS\n");
     }
+
+    if ((instruction & ))
 }
