@@ -13,6 +13,10 @@ no importa el orden en el que se empieza a comparar.
 pasar parámetros a main. 
 */
 
+void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void subs_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void update_flags(uint64_t result, CPU_State *NEXT_STATE);
+
 
 void process_instruction()
 {
@@ -24,35 +28,73 @@ void process_instruction()
     uint64_t PC = CURRENT_STATE.PC;
     uint32_t instruction =  mem_read_32(PC);
 
-    //Para chequear lo que estamos leyendo
     printf("Instruction: %x\n", instruction);
 
-    int adds_extended_opcode = 0b10101011001<<24;
-    int mask_11bits = 0b11111111111<<24;
-    int adds_immediate_opcode = 0b10110001<<24;
+//  Masks
+    int mask_11bits = 0b11111111111<<21;
     int mask_8bits = 0b11111111<<24;
 
 
-    printf("opcode: %x\n", adds_immediate_opcode);
+//  Opcodes
+    int subs_immediate_opcode = 0b11110001<<24;
+    int subs_extended_register_opcode = 0b11101011001<<21;
 
-    // printf("Mask: %n", instruction & adds_mask);
 
-    if ((instruction & mask_11bits) == adds_extended_opcode){
-        //imm12
-        int imm12_mask = 0b111111111111<<10;
-        int imm12 = (instruction & imm12_mask)>>10;
-        //Rn
-        int Rn_mask = 0b11111<<5;
-        int Rn = (instruction & Rn_mask)>>5;
-        //Rd
-        int Rd_mask = 0b11111;
-        int Rn = (instruction & Rd_mask);
+
+    if ((instruction & mask_8bits) == subs_immediate_opcode){
+        subs_immediate(instruction, &CURRENT_STATE, &NEXT_STATE); 
     }
 
-    if ((instruction & mask_8bits) == adds_immediate_opcode) {
-        printf("es un ADDS immediate!!!!\n");
+    if ((instruction & mask_11bits) == subs_extended_register_opcode){
+        subs_immediate(instruction, &CURRENT_STATE, &NEXT_STATE);
+    }
+
+
+
+    NEXT_STATE.PC  = PC + 4;
+}
+
+
+void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE) {
+//  se puede hacer en términos de un add a un not immediate. 
+
+    char shift = (pars & 0b11<<22) >> 22;
+    short imm12 = (pars & 0b111111111111<<10)>>10;
+    if (shift) {
+        imm12 = imm12 << 12;
+    }
+    short Rn = (pars & 0b11111<<5)>>5;
+    short Rd = pars & 0b11111;
+
+    NEXT_STATE->REGS[Rd] = (CURRENT_STATE->REGS[Rn]) - imm12;
+
+    update_flags(NEXT_STATE->REGS[Rd], NEXT_STATE);
+}
+
+
+void subs_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE) {
+    short Rm = (pars & 0b11111<<16)>>16;
+    short option = (pars & 0b111<<13)>>13; 
+    short imm3 = (pars & 0b111>>10)>>10;
+    short Rn = (pars & 0b11111<<5)>>5;
+    short Rd = pars & 0b11111;
+    
+    NEXT_STATE->REGS[Rd] = (CURRENT_STATE->REGS[Rn]) - (CURRENT_STATE->REGS[Rm]);
+    
+    update_flags(NEXT_STATE->REGS[Rd], NEXT_STATE);
+}
+
+
+void update_flags(uint64_t result, CPU_State *NEXT_STATE) {
+    if (result == 0) {
+        NEXT_STATE->FLAG_Z = 1;
     } else {
-        printf("no es un ADDS immediate\n");
+        NEXT_STATE->FLAG_Z = 0;
     }
 
+    if (result < 0) {
+        NEXT_STATE->FLAG_N = 1;
+    } else {
+        NEXT_STATE->FLAG_N = 0;
+    }
 }
