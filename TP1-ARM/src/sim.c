@@ -23,11 +23,10 @@ void cmp_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STAT
 void update_flags(uint64_t result, CPU_State *NEXT_STATE);
 int64_t option_switch(int option, int64_t operand_m, int imm3);
 void adds_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
-void adds_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void adds_extended(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void hlt();
 void ands_shifted(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void orr_shifted(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
-void update_flags(uint64_t result, CPU_State *NEXT_STATE);
 
 void process_instruction(){
     /* execute one instruction here. You should use CURRENT_STATE and modify
@@ -41,8 +40,6 @@ void process_instruction(){
     printf("Instruction: %x\n", instruction);
 
 //  Masks
-    int mask_11bits = 0b11111111111<<21;
-    int mask_8bits = 0b11111111<<24;
     
     uint32_t adds_extended_opcode = 0b10101011001<<21;
     uint32_t adds_immediate_opcode = 0b10110001<<24;
@@ -165,21 +162,6 @@ int64_t option_switch(int option, int64_t operand_m, int imm3) {
             break;
     }
     return operand_m;
-}
-
-
-void update_flags(uint64_t result, CPU_State *NEXT_STATE) {
-    if (result == 0) {
-        NEXT_STATE->FLAG_Z = 1;
-    } else {
-        NEXT_STATE->FLAG_Z = 0;
-    }
-
-    if (result < 0) {
-        NEXT_STATE->FLAG_N = 1;
-    } else {
-        NEXT_STATE->FLAG_N = 0;
-    }
 }
 
 void adds_extended(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
