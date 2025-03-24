@@ -28,12 +28,15 @@ void process_instruction(){
 
     //Para chequear lo que estamos leyendo
     printf("Instruction: %x\n", instruction);
-
-    uint32_t adds_extended_opcode = 0b10101011001<<24;
+    uint32_t adds_extended_opcode = 0b10101011001<<21;
     uint32_t adds_immediate_opcode = 0b10110001<<24;
-    uint32_t mask_11bits = 0b11111111111<<24;
+    uint32_t hlt_opcode = 0b11010100010<<21;
+    uint32_t ands_shifted_opcode = 0b11101010000<<21;
+    uint32_t mask_11bits = 0b11111111111<<21;
     uint32_t mask_8bits = 0b11111111<<24;
 
+    //printf("instruction & mask_8bits: %d\n", instruction & mask_8bits);
+    //printf("instruction & mask_11bits: %d\n", instruction & mask_11bits);
     if ((instruction & mask_11bits) == adds_extended_opcode){
     //suma entre 2 operandos, 1er operando depende del registro rn. si el registro vale 31 hay que sacar el operando del stack pointer.
     //stack pointer current state current regs[31].si no es igual a 31, lo saco del registro rn current state[rn].
@@ -104,7 +107,7 @@ void process_instruction(){
         uint64_t res = Rn + Rm;
         printf("res: %ld\n", res);
         NEXT_STATE.REGS[Rd] = res;
-        NEXT_STATE.FLAG_N = (res < 0);
+        NEXT_STATE.FLAG_N = (res >> 63) & 1;
         NEXT_STATE.FLAG_Z = (res == 0);
     }
 
@@ -135,7 +138,35 @@ void process_instruction(){
         //mem_write_32(Rd, res);
         //registers[Rd] = res;
         NEXT_STATE.REGS[Rd] = res;
-        NEXT_STATE.FLAG_N = (res < 0);
+        NEXT_STATE.FLAG_N = (res >> 63) & 1;
+        NEXT_STATE.FLAG_Z = (res == 0);
+    }
+
+    if ((instruction & mask_11bits) == hlt_opcode){
+        printf("es un HALT!!!!\n");
+        extern int RUN_BIT;
+        RUN_BIT = FALSE;
+    }
+
+    if ((instruction & mask_11bits) == ands_shifted_opcode){
+        printf("es un ANDS shifted!!!!\n");
+        //Rd
+        uint32_t Rd_mask = 0b11111;
+        uint32_t Rd = instruction & Rd_mask;
+        printf("Rd: %d\n", Rd);
+        //Rn
+        uint32_t Rn_mask = 0b11111<<5;
+        uint32_t Rn = (instruction & Rn_mask)>>5;
+        printf("Rn: %d\n", Rn);
+        //Rm
+        uint32_t Rm_mask = 0b11111<<16;
+        uint32_t Rm = (instruction & Rm_mask)>>16;
+        printf("Rm: %d\n", Rm);
+
+        uint64_t res = registers[Rn] & registers[Rm];
+        printf("res: %ld\n", res);
+        NEXT_STATE.REGS[Rd] = res;
+        NEXT_STATE.FLAG_N = (res >> 63) & 1;
         NEXT_STATE.FLAG_Z = (res == 0);
     }
 
