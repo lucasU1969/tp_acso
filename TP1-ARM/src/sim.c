@@ -18,6 +18,7 @@ void adds_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STA
 void adds_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void hlt();
 void ands_shifted(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void orr_shifted(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void update_flags(uint64_t result, CPU_State *NEXT_STATE);
 
 void process_instruction(){
@@ -35,6 +36,7 @@ void process_instruction(){
     uint32_t adds_immediate_opcode = 0b10110001<<24;
     uint32_t hlt_opcode = 0b11010100010<<21;
     uint32_t ands_shifted_opcode = 0b11101010000<<21;
+    uint32_t orr_opcode = 0b10101010000<<21;
 
     uint32_t mask_11bits = 0b11111111111<<21;
     uint32_t mask_8bits = 0b11111111<<24;
@@ -54,6 +56,10 @@ void process_instruction(){
 
     if ((instruction & mask_11bits) == ands_shifted_opcode){
         ands_shifted(instruction, &CURRENT_STATE, &NEXT_STATE);
+    }
+
+    if ((instruction & mask_11bits) == orr_opcode){
+        orr_shifted(instruction, &CURRENT_STATE, &NEXT_STATE);
     }
 
     //Actualizo PC
@@ -145,6 +151,21 @@ void ands_shifted(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEX
     printf("Rm: %d\n", Rm);
 
     uint64_t res = CURRENT_STATE -> REGS[Rn] & CURRENT_STATE -> REGS[Rm];
+    printf("res: %ld\n", res);
+    NEXT_STATE -> REGS[Rd] = res;
+    update_flags(res, NEXT_STATE);
+}
+
+void orr_shifted(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
+    printf("es un ORR shifted!!!!\n");
+    uint32_t Rd = instruction & 0b11111;
+    uint32_t Rn = (instruction & 0b11111<<5)>>5;
+    uint32_t Rm = (instruction & 0b11111<<16)>>16;
+    printf("Rd: %d\n", Rd);
+    printf("Rn: %d\n", Rn);
+    printf("Rm: %d\n", Rm);
+
+    uint64_t res = CURRENT_STATE -> REGS[Rn] | CURRENT_STATE -> REGS[Rm];
     printf("res: %ld\n", res);
     NEXT_STATE -> REGS[Rd] = res;
     update_flags(res, NEXT_STATE);
