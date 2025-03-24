@@ -13,9 +13,14 @@ no importa el orden en el que se empieza a comparar.
 pasar parámetros a main. 
 */
 
+void process_instruction();
 void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void subs_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void cmp_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+
+
 void update_flags(uint64_t result, CPU_State *NEXT_STATE);
+int64_t option_switch(int option, int64_t operand_m, int imm3);
 
 
 void process_instruction()
@@ -39,14 +44,15 @@ void process_instruction()
     int subs_immediate_opcode = 0b11110001<<24;
     int subs_extended_register_opcode = 0b11101011001<<21;
 
-
+    printf("subs (extended register) opcode: %x\n", subs_extended_register_opcode);
 
     if ((instruction & mask_8bits) == subs_immediate_opcode){
         subs_immediate(instruction, &CURRENT_STATE, &NEXT_STATE); 
     }
 
     if ((instruction & mask_11bits) == subs_extended_register_opcode){
-        subs_immediate(instruction, &CURRENT_STATE, &NEXT_STATE);
+        printf("subs_extended_register\n");
+        subs_extended_register(instruction, &CURRENT_STATE, &NEXT_STATE);
     }
 
 
@@ -57,6 +63,7 @@ void process_instruction()
 
 void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE) {
 //  se puede hacer en términos de un add a un not immediate. 
+// ya hace el cmp.
 
     char shift = (pars & 0b11<<22) >> 22;
     short imm12 = (pars & 0b111111111111<<10)>>10;
@@ -69,19 +76,63 @@ void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STA
     NEXT_STATE->REGS[Rd] = (CURRENT_STATE->REGS[Rn]) - imm12;
 
     update_flags(NEXT_STATE->REGS[Rd], NEXT_STATE);
+
+    if (Rd == 0b11111) {
+        NEXT_STATE->REGS[Rd] = CURRENT_STATE->REGS[Rd];
+    }
 }
 
 
 void subs_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE) {
+// hace el cmp.
     short Rm = (pars & 0b11111<<16)>>16;
     short option = (pars & 0b111<<13)>>13; 
     short imm3 = (pars & 0b111>>10)>>10;
     short Rn = (pars & 0b11111<<5)>>5;
     short Rd = pars & 0b11111;
-    
-    NEXT_STATE->REGS[Rd] = (CURRENT_STATE->REGS[Rn]) - (CURRENT_STATE->REGS[Rm]);
+
+    int64_t operand_m = option_switch(option, CURRENT_STATE->REGS[Rm], imm3);
+
+    NEXT_STATE->REGS[Rd] = (CURRENT_STATE->REGS[Rn]) - operand_m;
     
     update_flags(NEXT_STATE->REGS[Rd], NEXT_STATE);
+
+    if (Rd == 0b11111) {
+        NEXT_STATE->REGS[Rd] = CURRENT_STATE->REGS[Rd];
+    }
+}
+
+
+
+int64_t option_switch(int option, int64_t operand_m, int imm3) {
+    switch (option) {
+        case 0b000: 
+            operand_m = (uint32_t) (char) operand_m;
+            break;
+        case 0b001:
+            operand_m = (uint32_t) (short) operand_m;
+            break;
+        case 0b010:
+            operand_m = (uint64_t) (uint32_t) operand_m;
+            break;
+        case 0b011:
+            operand_m = operand_m<<imm3;
+            operand_m = (uint64_t) operand_m;
+            break;
+        case 0b100: 
+            operand_m = (int32_t) (char) operand_m;
+            break;
+        case 0b101: 
+            operand_m = (int32_t) (short) operand_m;
+            break;
+        case 0b110:
+            operand_m = (int64_t) (uint32_t) operand_m;
+            break;
+        case 0b111: 
+            operand_m = (int64_t) operand_m;
+            break;
+    }
+    return operand_m;
 }
 
 
