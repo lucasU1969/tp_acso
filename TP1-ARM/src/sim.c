@@ -14,19 +14,33 @@ se puede modelar como punteros a función.
 no importa el orden en el que se empieza a comparar. 
 pasar parámetros a main. 
 */
-
 void process_instruction();
+
+
+// tested: 
 void adds_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
-void adds_extended(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void subs_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+    // cmp extended_register
+    // cmp immediate
+
+
+
+    // to test:
+void eor_shifted_register(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+
+
 void hlt(int *RUN_BIT);
 void ands_shifted(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
-void eor_shifted_register(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void orr_shifted(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void b(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void br(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
-void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+
+// sus: 
+void adds_extended(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+
 
 void update_flags(uint64_t result, CPU_State *NEXT_STATE);
 int64_t option_switch(int option, int64_t operand_m, int imm3);
@@ -53,14 +67,15 @@ void process_instruction(){
     uint32_t adds_extended_opcode = 0b10101011001<<21;
     uint32_t adds_immediate_opcode = 0b10110001<<24;
     uint32_t subs_immediate_opcode = 0b11110001<<24;
-    uint32_t subs_extended_register_opcode = 0b11101011001<<21;
+    uint32_t subs_extended_register_opcode = 0b11101011000<<21;
     uint32_t hlt_opcode = 0b11010100010<<21;
     uint32_t ands_shifted_opcode = 0b11101010000<<21;
     uint32_t eor_shifted_register_opcode = 0b11001010000<<21;
     uint32_t orr_opcode = 0b10101010000<<21;
     uint32_t b_opcode = 0b000101<<26;
     uint32_t br_opcode = 0b11010110000111110000<<10;
-    uint32_t b_cond = 01010100<<24;
+    uint32_t b_cond_opcode = 0b01010100<<24;
+    uint32_t logical_shift_immediate_opcode = 0b110100110<<
 
     printf("subs (extended register) opcode: %x\n", subs_extended_register_opcode);
 
@@ -69,7 +84,6 @@ void process_instruction(){
     }
 
     if ((instruction & mask_11bits) == subs_extended_register_opcode){
-        printf("subs_extended_register\n");
         subs_extended_register(instruction, &CURRENT_STATE, &NEXT_STATE);
     }
 
@@ -105,7 +119,7 @@ void process_instruction(){
         br(instruction, &CURRENT_STATE, &NEXT_STATE);
     }
 
-    if ((instruction & mask_8bits) == b_cond){
+    if ((instruction & mask_8bits) == b_cond_opcode){
         b_cond(instruction, &CURRENT_STATE, &NEXT_STATE);
     }
 
@@ -114,9 +128,6 @@ void process_instruction(){
 }
 
 void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE) {
-//  se puede hacer en términos de un add a un not immediate. 
-// ya hace el cmp.
-
     char shift = (pars & 0b11<<22) >> 22;
     short imm12 = (pars & 0b111111111111<<10)>>10;
     if (shift) {
@@ -128,60 +139,18 @@ void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STA
     NEXT_STATE->REGS[Rd] = (CURRENT_STATE->REGS[Rn]) - imm12;
 
     update_flags(NEXT_STATE->REGS[Rd], NEXT_STATE);
-
-    if (Rd == 0b11111) {
-        NEXT_STATE->REGS[Rd] = CURRENT_STATE->REGS[Rd];
-    }
 }
 
 void subs_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE) {
-// hace el cmp.
     short Rm = (pars & 0b11111<<16)>>16;
     short option = (pars & 0b111<<13)>>13; 
     short imm3 = (pars & 0b111>>10)>>10;
     short Rn = (pars & 0b11111<<5)>>5;
     short Rd = pars & 0b11111;
 
-    int64_t operand_m = option_switch(option, CURRENT_STATE->REGS[Rm], imm3);
-
-    NEXT_STATE->REGS[Rd] = (CURRENT_STATE->REGS[Rn]) - operand_m;
+    NEXT_STATE->REGS[Rd] = (CURRENT_STATE->REGS[Rn]) - (CURRENT_STATE->REGS[Rm]);
     
     update_flags(NEXT_STATE->REGS[Rd], NEXT_STATE);
-
-    if (Rd == 0b11111) {
-        NEXT_STATE->REGS[Rd] = CURRENT_STATE->REGS[Rd];
-    }
-}
-
-int64_t option_switch(int option, int64_t operand_m, int imm3) {
-    switch (option) {
-        case 0b000: 
-            operand_m = (uint32_t) (char) operand_m;
-            break;
-        case 0b001:
-            operand_m = (uint32_t) (short) operand_m;
-            break;
-        case 0b010:
-            operand_m = (uint64_t) (uint32_t) operand_m;
-            break;
-        case 0b011:
-            operand_m = operand_m<<imm3;
-            operand_m = (uint64_t) operand_m;
-            break;
-        case 0b100: 
-            operand_m = (int32_t) (char) operand_m;
-            break;
-        case 0b101: 
-            operand_m = (int32_t) (short) operand_m;
-            break;
-        case 0b110:
-            operand_m = (int64_t) (uint32_t) operand_m;
-            break;
-        case 0b111: 
-            operand_m = (int64_t) operand_m;
-            break;
-    }
-    return operand_m;
 }
 
 void adds_extended(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
@@ -197,7 +166,7 @@ void adds_extended(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NE
     uint32_t imm3 = (instruction & 0b111<<10)>>10;
     uint32_t option = (instruction & 0b111>>13)<<13;
     uint32_t Rm = (instruction & 0b11111>>16)<<16;
-
+    
     //Operando 1
     if (CURRENT_STATE -> REGS[Rn] == 31){
         Rn = CURRENT_STATE -> REGS[31];
@@ -211,9 +180,9 @@ void adds_extended(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NE
         case 0b001: Rm = (uint16_t)Rm; break;
         case 0b010: Rm = (uint32_t)Rm; break;
         case 0b011:
-            Rm = (uint64_t)Rm;
-            Rm = Rm << imm3;
-            break;
+        Rm = (uint64_t)Rm;
+        Rm = Rm << imm3;
+        break;
         case 0b100: Rm = (int8_t)Rm; break;
         case 0b101: Rm = (int16_t)Rm; break;
         case 0b110: Rm = (int32_t)Rm; break;
@@ -225,7 +194,7 @@ void adds_extended(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NE
     printf("Rm: %d\n", Rm);
     printf("Imm3: %d\n", imm3);
     printf("Option: %d\n", option);
-
+    
     //Operacion y flags (por fin, que horror)
     uint64_t res = Rn + Rm;
     printf("res: %ld\n", res);
@@ -266,7 +235,7 @@ void ands_shifted(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEX
     printf("Rd: %d\n", Rd);
     printf("Rn: %d\n", Rn);
     printf("Rm: %d\n", Rm);
-
+    
     uint64_t res = CURRENT_STATE -> REGS[Rn] & CURRENT_STATE -> REGS[Rm];
     printf("res: %ld\n", res);
     NEXT_STATE -> REGS[Rd] = res;
@@ -281,7 +250,7 @@ void orr_shifted(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT
     printf("Rd: %d\n", Rd);
     printf("Rn: %d\n", Rn);
     printf("Rm: %d\n", Rm);
-
+    
     uint64_t res = CURRENT_STATE -> REGS[Rn] | CURRENT_STATE -> REGS[Rm];
     printf("res: %ld\n", res);
     NEXT_STATE -> REGS[Rd] = res;
@@ -293,7 +262,7 @@ void eor_shifted_register(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_St
     short Rn = (instruction & 0b11111<<5)>>5;
     short Rm = (instruction & 0b11111<<16)>>16;
     short imm6 = (instruction & 0b111111<<10)>>10;
-
+    
     uint64_t res = CURRENT_STATE -> REGS[Rn] ^ CURRENT_STATE -> REGS[Rm];
     NEXT_STATE -> REGS[Rd] = res;
     update_flags(res, NEXT_STATE);
@@ -311,16 +280,91 @@ void br(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
 }
 
 void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
-    uint64_t offset = (uint64_t) (instruction & 0b11111111<<8)<<2;
-    short cond = (instruction & 0b11111);
-
+    uint32_t imm19 = (instruction & 0b1111111111111111111<<5)>>5;
+    short cond = (instruction & 0b1111);
+    uint64_t offset = (int64_t) (imm19 << 2);
+    switch (cond) {
+        case 0b0000: // EQ 
+            if (!(CURRENT_STATE -> FLAG_Z)) {
+                NEXT_STATE -> PC += offset;
+            }
+            break;
+        case 0b0001: // NE
+            if (CURRENT_STATE -> FLAG_Z) {
+                NEXT_STATE -> PC += offset;
+            }
+            break;
+        case 0b1100: // GT
+            if (!(CURRENT_STATE -> FLAG_N) && !(CURRENT_STATE -> FLAG_Z)) {
+                NEXT_STATE -> PC += offset;
+            }
+            break;
+        case 0b1011: // LT
+            if ((CURRENT_STATE -> FLAG_N) && !(CURRENT_STATE -> FLAG_Z)) {
+                NEXT_STATE -> PC += offset;
+            }
+            break;
+        case 0b1010: // GE
+            if (!(CURRENT_STATE -> FLAG_N) || (CURRENT_STATE -> FLAG_Z)) {
+                NEXT_STATE -> PC += offset;
+            }
+            break;
+        case 0b1101: // LE
+            if ((CURRENT_STATE -> FLAG_N) || (CURRENT_STATE -> FLAG_Z)) {
+                NEXT_STATE -> PC += offset;
+            }
+            break;
+    }
+    
     
 }
 
+void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
+    uint32_t Rd = instruction & 0b11111;
+    uint32_t Rn = (instruction & 0b11111<<5)>>5;
+    uint32_t imms = (instruction & 0b111111<<10)>>10;
+    uint32_t immr = (instruction & 0b111111<<16)>>16;
 
+    if (imms == 0b011111 || imms == 0b111111) {
+        NEXT_STATE -> REGS[Rd] = CURRENT_STATE -> REGS[Rn] >> immr;
+    } else {
+        NEXT_STATE -> REGS[Rd] = CURRENT_STATE -> REGS[Rn] << imms;
+    }
+}
 
 
 void update_flags(uint64_t res, CPU_State *NEXT_STATE) {
     NEXT_STATE -> FLAG_N = (res >> 63) & 1;
     NEXT_STATE -> FLAG_Z = (res == 0);
+}
+
+int64_t option_switch(int option, int64_t operand_m, int imm3) {
+    switch (option) {
+        case 0b000: 
+            operand_m = (uint32_t) (char) operand_m;
+            break;
+        case 0b001:
+            operand_m = (uint32_t) (short) operand_m;
+            break;
+        case 0b010:
+            operand_m = (uint64_t) (uint32_t) operand_m;
+            break;
+        case 0b011:
+            operand_m = operand_m<<imm3;
+            operand_m = (uint64_t) operand_m;
+            break;
+        case 0b100: 
+            operand_m = (int32_t) (char) operand_m;
+            break;
+        case 0b101: 
+            operand_m = (int32_t) (short) operand_m;
+            break;
+        case 0b110:
+            operand_m = (int64_t) (uint32_t) operand_m;
+            break;
+        case 0b111: 
+            operand_m = (int64_t) operand_m;
+            break;
+    }
+    return operand_m;
 }
