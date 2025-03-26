@@ -8,6 +8,17 @@
 extern CPU_State CURRENT_STATE;
 extern CPU_State NEXT_STATE;
 extern int RUN_BIT;
+extern 
+
+/*
+    PREGUNTAR: 
+        1. LSL (immediate): por qué los valores de los immediates están mal? hay que hacer una operación entre los dos immediates
+        2. EOR (shifted register): actualiza flags? no
+        3. ADDS (extended register), SUBS (extended register): option switch?
+        4. En qué caso se usa el stack? nunca
+        5. Casos en los que Rn = 31? 
+*/
+
 
 /*
 se puede modelar como punteros a función. 
@@ -21,8 +32,8 @@ void process_instruction();
 void adds_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void subs_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
-    // cmp extended_register
-    // cmp immediate
+// cmp extended_register
+// cmp immediate
 void eor_shifted_register(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 
@@ -30,6 +41,9 @@ void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STAT
     
     // to test:
 void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void stur(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void movz(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void mul(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 
 
 void hlt(int *RUN_BIT);
@@ -37,6 +51,7 @@ void ands_shifted(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE
 void orr_shifted(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void b(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void br(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void cbz(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);    
 
 // sus: 
 void adds_extended(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
@@ -62,6 +77,7 @@ void process_instruction(){
     uint32_t mask_11bits = 0b11111111111<<21;
     uint32_t mask_8bits = 0b11111111<<24;
     uint32_t mask_6bits = 0b111111<<26;
+    uint32_t mask_9bits = 0b111111111<<23;
 
 //  Opcodes
     uint32_t adds_extended_opcode = 0b10101011001<<21;
@@ -76,6 +92,10 @@ void process_instruction(){
     uint32_t br_opcode = 0b11010110000111110000<<10;
     uint32_t b_cond_opcode = 0b01010100<<24;
     uint32_t logical_shift_immediate_opcode = 0b110100110<<23;
+    uint32_t stur_opcode = 0b11111000000<<21;
+    uint32_t movz_opcode = 0b11010010100<<21;
+    uint32_t mul_opcode =  0b10011011000<<21;
+    uint32_t cbz_opcode = 0b10110100<<24;
 
     char program_counter_increase = 1;
 
@@ -125,6 +145,28 @@ void process_instruction(){
         b_cond(instruction, &CURRENT_STATE, &NEXT_STATE);
         program_counter_increase = 0;
     }
+
+    if ((instruction & mask_9bits) == logical_shift_immediate_opcode){
+        logical_shift_immediate(instruction, &CURRENT_STATE, &NEXT_STATE);
+    }
+
+    if ((instruction & mask_11bits) == stur_opcode){
+        stur(instruction, &CURRENT_STATE, &NEXT_STATE);
+    }
+
+    if ((instruction & mask_11bits) == movz_opcode){
+        movz(instruction, &CURRENT_STATE, &NEXT_STATE);
+    }
+
+    if ((instruction & mask_11bits) == mul_opcode) {
+        mul(instruction, &CURRENT_STATE, &NEXT_STATE);
+    }
+
+    if ((instruction & mask_8bits) == cbz_opcode){
+        cbz(instruction, &CURRENT_STATE, &NEXT_STATE);
+    }
+
+
 
     //Actualizo PC
     if (program_counter_increase) {
@@ -208,21 +250,14 @@ void adds_extended(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NE
 }
 
 void adds_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
-    printf("es un ADDS immediate!!!!\n");
     uint32_t Rd = instruction & 0b11111;
     uint32_t Rn = (instruction & 0b11111<<5)>>5;
     uint32_t imm12 = (instruction & 0b111111111111<<10)>>10;
     uint32_t shift = (instruction & 0b11<<22)>>22;
-    printf("Rd: %d\n", Rd);
-    printf("Rn: %d\n", Rn);
-    printf("imm12: %d\n", imm12);
-    printf("shift: %d\n", shift);
     if (shift == 01){
         imm12 = imm12<<12;
     }
-    //Operacion y flags
     uint64_t res = CURRENT_STATE -> REGS[Rn] + imm12;
-    printf("res: %ld\n", res);
     NEXT_STATE -> REGS[Rd] = res;
     update_flags(res, NEXT_STATE);
 }
@@ -333,19 +368,98 @@ void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STAT
 }
 
 void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
-    uint32_t Rd = instruction & 0b11111;
-    uint32_t Rn = (instruction & 0b11111<<5)>>5;
-    uint32_t imms = (instruction & 0b111111<<10)>>10;
-    uint32_t immr = (instruction & 0b111111<<16)>>16;
+    uint8_t Rd = instruction & 0b11111;
+    uint8_t Rn = (instruction & 0b11111<<5)>>5;
+    uint8_t imms = instruction>>10 & 0b111111;
+    uint8_t immr = instruction>>16 & 0b111111;
 
-    if (imms == 0b011111 || imms == 0b111111) {
+    /*
+    lsl x3, x1, 1
+
+    opcode    N immr   imms   Rn    Rd
+    110100110 1 111111 111110 00001 00011
+    
+    */
+
+    // printf("Rd: %d\n", Rd);
+    // printf("Rn: %d\n", Rn);
+    // printf("imms: %d\n", imms);
+    // printf("immr: %d\n", immr);
+
+    // printf("imms == 0b111111: %d\n", imms == 0b111111);
+
+    if (imms == 0b111111) {
         NEXT_STATE -> REGS[Rd] = CURRENT_STATE -> REGS[Rn] >> immr;
     } else {
-        NEXT_STATE -> REGS[Rd] = CURRENT_STATE -> REGS[Rn] << imms;
+        NEXT_STATE -> REGS[Rd] = CURRENT_STATE -> REGS[Rn] << 64 - immr;
     }
 }
 
 
+void stur(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
+    int16_t imm9;
+    if (instruction >> 20 & 0b1) {
+        int16_t imm9 = (instruction>>12) | 0b111111<<10;
+
+    } else {
+        uint16_t imm9 = instruction>>12 & 0b111111111;
+    }
+    uint8_t Rn = instruction>>5 & 0b11111;
+    uint8_t Rt = instruction & 0b11111;
+
+    int64_t offset = (int64_t) imm9;
+
+    int64_t address;
+
+    if (Rn != 31) {
+        int64_t address = CURRENT_STATE -> REGS[Rn] + offset;
+    }
+    else {
+        // caso stack pointer
+    } 
+
+    int64_t data = CURRENT_STATE -> REGS[Rt];
+
+    int32_t higher_data_bits = data >> 32;
+    int32_t lower_data_bits = data & 0xFFFFFFFF;
+
+    mem_write_32(address, lower_data_bits);
+    mem_write_32(address + 4, higher_data_bits);
+}
+
+void movz(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
+    uint8_t Rd = instruction & 0b11111;
+    uint16_t imm16 = instruction >> 5 & 0xFFFF;
+
+    NEXT_STATE -> REGS[Rd] = imm16;
+}
+
+
+void mul(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE) {
+    uint8_t Rm = instruction>>16 & 0b11111;
+    uint8_t Rn = instruction>>5 & 0b11111;
+    uint8_t Rd = instruction & 0b11111;
+
+    NEXT_STATE -> REGS[Rd] = CURRENT_STATE -> REGS[Rn] * CURRENT_STATE -> REGS[Rm];
+    update_flags(NEXT_STATE -> REGS[Rd], NEXT_STATE);
+}
+
+
+void cbz(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
+    uint8_t Rt = instruction & 0b11111;
+    int64_t imm19;
+    if (instruction>>23 & 0b1){
+        int16_t imm19 = (instruction>>5 & 0b1111111111111111111) | 0b1111111111111111111<<5;
+    } else {
+        int16_t imm19 = instruction>>5 & 0b1111111111111111111;
+    }
+    int64_t offset = imm19 << 2;
+
+    if (CURRENT_STATE -> REGS[Rt] == 0) {
+        NEXT_STATE -> PC += offset;
+    }
+    NEXT_STATE -> PC += 4;
+}
 
 
 void update_flags(uint64_t res, CPU_State *NEXT_STATE) {
