@@ -23,11 +23,11 @@ void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STA
 void subs_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
     // cmp extended_register
     // cmp immediate
-
-
-
-    // to test:
 void eor_shifted_register(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+
+    
+    
+    // to test:
 void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 
@@ -75,9 +75,9 @@ void process_instruction(){
     uint32_t b_opcode = 0b000101<<26;
     uint32_t br_opcode = 0b11010110000111110000<<10;
     uint32_t b_cond_opcode = 0b01010100<<24;
-    uint32_t logical_shift_immediate_opcode = 0b110100110<<
+    uint32_t logical_shift_immediate_opcode = 0b110100110<<23;
 
-    printf("subs (extended register) opcode: %x\n", subs_extended_register_opcode);
+    char program_counter_increase = 1;
 
     if ((instruction & mask_8bits) == subs_immediate_opcode){
         subs_immediate(instruction, &CURRENT_STATE, &NEXT_STATE); 
@@ -109,6 +109,7 @@ void process_instruction(){
 
     if ((instruction & mask_6bits) == b_opcode){
         b(instruction, &CURRENT_STATE, &NEXT_STATE);
+        program_counter_increase = 0;
     }
 
     if ((instruction & mask_11bits) == eor_shifted_register_opcode){
@@ -117,14 +118,18 @@ void process_instruction(){
 
     if ((instruction & mask_22bits)== br_opcode){
         br(instruction, &CURRENT_STATE, &NEXT_STATE);
+        program_counter_increase = 0;
     }
 
     if ((instruction & mask_8bits) == b_cond_opcode){
         b_cond(instruction, &CURRENT_STATE, &NEXT_STATE);
+        program_counter_increase = 0;
     }
 
     //Actualizo PC
-    NEXT_STATE.PC += 4;
+    if (program_counter_increase) {
+        NEXT_STATE.PC += 4;
+    }
 }
 
 void subs_immediate(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE) {
@@ -263,9 +268,11 @@ void eor_shifted_register(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_St
     short Rm = (instruction & 0b11111<<16)>>16;
     short imm6 = (instruction & 0b111111<<10)>>10;
     
-    uint64_t res = CURRENT_STATE -> REGS[Rn] ^ CURRENT_STATE -> REGS[Rm];
-    NEXT_STATE -> REGS[Rd] = res;
-    update_flags(res, NEXT_STATE);
+    NEXT_STATE -> REGS[Rd] = CURRENT_STATE -> REGS[Rn] ^ CURRENT_STATE -> REGS[Rm];
+
+
+    // preguntar si EOR (shifted register) actualiza flags
+    // update_flags(NEXT_STATE -> REGS[Rd], NEXT_STATE);
 }
 
 void b(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
@@ -280,17 +287,24 @@ void br(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
 }
 
 void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
-    uint32_t imm19 = (instruction & 0b1111111111111111111<<5)>>5;
+    int64_t imm19;
+    if (instruction & 0b1<<23) {
+        int32_t masked_instruction = instruction | 0b11111111<<24;
+        imm19 = (masked_instruction & 0b111111111111111111111111111<<5)>>5;
+    } else {
+        imm19 = (instruction & 0b1111111111111111111<<5)>>5;
+    }
+    int64_t offset = imm19 << 2;
     short cond = (instruction & 0b1111);
-    uint64_t offset = (int64_t) (imm19 << 2);
+
     switch (cond) {
         case 0b0000: // EQ 
-            if (!(CURRENT_STATE -> FLAG_Z)) {
+            if (CURRENT_STATE -> FLAG_Z) {
                 NEXT_STATE -> PC += offset;
             }
             break;
         case 0b0001: // NE
-            if (CURRENT_STATE -> FLAG_Z) {
+            if (!(CURRENT_STATE -> FLAG_Z)) {
                 NEXT_STATE -> PC += offset;
             }
             break;
@@ -315,8 +329,6 @@ void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STAT
             }
             break;
     }
-    
-    
 }
 
 void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
@@ -331,6 +343,8 @@ void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU
         NEXT_STATE -> REGS[Rd] = CURRENT_STATE -> REGS[Rn] << imms;
     }
 }
+
+
 
 
 void update_flags(uint64_t res, CPU_State *NEXT_STATE) {
