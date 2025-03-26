@@ -24,11 +24,11 @@ void subs_extended_register(uint32_t pars, CPU_State *CURRENT_STATE, CPU_State *
     // cmp extended_register
     // cmp immediate
 void eor_shifted_register(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 
     
     
     // to test:
-void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 
 
@@ -329,6 +329,7 @@ void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STAT
             }
             break;
     }
+    NEXT_STATE -> PC += 4;
 }
 
 void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
