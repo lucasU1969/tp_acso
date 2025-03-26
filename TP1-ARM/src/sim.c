@@ -397,31 +397,34 @@ void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU
 
 
 void stur(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE){
+    
+    
     int16_t imm9;
     if (instruction >> 20 & 0b1) {
-        int16_t imm9 = (instruction>>12) | 0b111111<<10;
-
+        int16_t imm9 = (instruction>>12) | 0b1111111<<10;
     } else {
         uint16_t imm9 = instruction>>12 & 0b111111111;
     }
+    // int16_t imm9 = (instruction>>12) & 0b111111111;
     uint8_t Rn = instruction>>5 & 0b11111;
     uint8_t Rt = instruction & 0b11111;
-
+    printf("current_state -> regs[rn]: %lx\n", CURRENT_STATE -> REGS[Rn]);
+    
     int64_t offset = (int64_t) imm9;
 
-    int64_t address;
-
-    if (Rn != 31) {
-        int64_t address = CURRENT_STATE -> REGS[Rn] + offset;
-    }
-    else {
-        // caso stack pointer
-    } 
+    int64_t address = CURRENT_STATE -> REGS[Rn] + offset;
 
     int64_t data = CURRENT_STATE -> REGS[Rt];
 
+    
+
+    printf("data: %lx\n", data);
+    printf("address: %lx\n", address);
+    printf("offset: %lx\n", offset);
+
     int32_t higher_data_bits = data >> 32;
     int32_t lower_data_bits = data & 0xFFFFFFFF;
+
 
     mem_write_32(address, lower_data_bits);
     mem_write_32(address + 4, higher_data_bits);
