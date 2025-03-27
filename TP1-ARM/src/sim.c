@@ -8,7 +8,6 @@
 extern CPU_State CURRENT_STATE;
 extern CPU_State NEXT_STATE;
 extern int RUN_BIT;
-extern 
 
 /*
     PREGUNTAR: 
@@ -38,14 +37,13 @@ void eor_shifted_register(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_St
 void b_cond(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void logical_shift_immediate(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void stur(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
-
+void sturb(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void sturh(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void movz(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
+void mul(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 
 
 // to test:
-void sturb(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
-void sturh(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
-void mul(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);
 void cbz(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE);   
 void cbnz(uint32_t instruction, CPU_State *CURRENT_STATE, CPU_State *NEXT_STATE); 
 
