@@ -8,6 +8,9 @@
 void process_instruction();
 
 
+// MANEJO DE POSICIONES DE .DATA INVÁLIDAS
+// MANEJO DE POSICIONES DE .TEXT INVÁLIDAS
+
 // tested:
 void adds_immediate(uint32_t pars);
 void adds_extended(uint32_t pars);
@@ -24,23 +27,24 @@ void sturb(uint32_t instruction);
 void sturh(uint32_t instruction);
 void movz(uint32_t instruction);
 void mul(uint32_t instruction);
-
-
-// to test:
-void cbz(uint32_t instruction);   
-void cbnz(uint32_t instruction); 
 void b(uint32_t instruction);
 void br(uint32_t instruction);
-void add_immediate(uint32_t instruction);
-void add_extended(uint32_t instruction);
-void ldur(uint32_t instruction);
+void cbz(uint32_t instruction);   
+void cbnz(uint32_t instruction); 
 void ldurb(uint32_t instruction);
+void ldur(uint32_t instruction);
 void ldurh(uint32_t instruction);
+void add_immediate(uint32_t instruction);
+
+
+// to test: SUS
+void add_extended(uint32_t instruction);
 
 
 
 void update_flags(uint64_t result);
 int64_t sign_extend(int64_t value, int64_t idx);
+void jump_if(int64_t offset, int8_t bool);
 
 typedef struct instruction_t {
     uint32_t opcode;
@@ -77,6 +81,7 @@ void process_instruction(){
         {0b10010001<<24, add_immediate},
         {0b10001011000<<21, add_extended},
     };
+    // 10001011000
 
     uint32_t masks[] = {
         0b1111111111111111111111<<10,
@@ -178,14 +183,14 @@ void eor_shifted_register(uint32_t instruction) {
 }
 
 void b(uint32_t instruction){
-    uint32_t imm26 = (instruction & 0b11111111111111111111111111)<<2;
-    NEXT_STATE.PC += (int64_t) imm26;
+    int64_t target = sign_extend(instruction, 25)<<2;
+    NEXT_STATE.PC += target-4;
 }
 
 void br(uint32_t instruction){
     uint32_t Rm = (instruction & 0b11111<<5)>>5;
     uint64_t target = CURRENT_STATE.REGS[Rm];
-    NEXT_STATE.PC = target;
+    NEXT_STATE.PC = target-4;
 }
 
 void b_cond(uint32_t instruction){
@@ -310,11 +315,9 @@ void ldurb(uint32_t instruction){
 void ldurh(uint32_t instruction){
     uint32_t Rt = (instruction & 0b11111);
     uint32_t Rn = (instruction & 0b11111<<5)>>5;
-    int16_t imm9;
     int64_t offset = sign_extend(instruction>>12, 8);
     int64_t address = CURRENT_STATE.REGS[Rn] + offset;
-    int32_t data = mem_read_32(address);
-    int32_t lower_data_bits = mem_read_32(address) & 0xFFFF<<16;
+    int32_t lower_data_bits = mem_read_32(address) & 0xFFFF;
     NEXT_STATE.REGS[Rt] = lower_data_bits;
 }
 
@@ -338,24 +341,14 @@ void mul(uint32_t instruction) {
 
 void cbz(uint32_t instruction){
     uint8_t Rt = instruction & 0b11111;
-    int64_t imm19;
     int64_t offset = sign_extend(instruction>>5, 18) << 2;
-    
-    if (CURRENT_STATE.REGS[Rt] == 0) {
-        NEXT_STATE.PC += offset;
-    }
-    NEXT_STATE.PC += 4;
+    jump_if(offset, CURRENT_STATE.REGS[Rt] == 0);
 }
 
 void cbnz(uint32_t instruction) {
     uint8_t Rt = instruction & 0b11111;
-    int64_t imm19;
     int64_t offset = sign_extend(instruction>>5, 18) << 2;
-    
-    if (CURRENT_STATE.REGS[Rt] != 0) {
-        NEXT_STATE.PC += offset;
-    }
-    NEXT_STATE.PC += 4;
+    jump_if(offset, CURRENT_STATE.REGS[Rt] != 0);
 }
 
 void add_immediate(uint32_t instruction){
@@ -373,10 +366,12 @@ void add_immediate(uint32_t instruction){
 void add_extended(uint32_t instruction){
     uint32_t Rd = (instruction & 0b11111);
     uint32_t Rn = (instruction & 0b11111<<5)>>5;
-    uint32_t Rm = (instruction & 0b11111>>16)<<16;
+    uint32_t Rm = (instruction & 0b11111<<16)>>16;
     uint64_t res = CURRENT_STATE.REGS[Rn] + CURRENT_STATE.REGS[Rm];
     NEXT_STATE.REGS[Rd] = res;
 }
+
+
 
 void update_flags(uint64_t res) {
     NEXT_STATE.FLAG_N = (res >> 63) & 1;
@@ -391,4 +386,10 @@ int64_t sign_extend(int64_t value, int64_t idx) {
         res = value & ~(0xFFFFFFFFFFFFFFFF << (idx+1));
     }
     return res;
+}
+
+void jump_if(int64_t offset, int8_t bool) {
+    if (bool) {
+        NEXT_STATE.PC += offset-4;
+    }
 }
