@@ -20,8 +20,10 @@ _start:
     add X9, X9, X10          // Sumar 1 a X9, lo que debería causar overflow
 
     // Test 4: ADD (Extended Register) con números negativos
-    mov X11, 0x8000000000000000 // Cargar el valor más bajo de 64 bits en X11
-    mov X12, 0x1000000000000000 // Cargar un valor positivo grande en X12
+    mov X11, 0x8000 // Cargar el valor más bajo de 64 bits en X11
+    lsl X11, x11, 48
+    mov X12, 0x1000 // Cargar un valor positivo grande en X12
+    lsl x12, x12, 48
     add X11, X11, X12            // Sumar ambos registros, el resultado debe ser un número positivo
 
     // Test 5: ADD (Extended Register) con números pequeños que no causan Overflow

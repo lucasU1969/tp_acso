@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
-#include<stdint.h>
+#include <stdint.h>
 #include "shell.h"
+#include <stdlib.h>
 
 
 void process_instruction();
@@ -11,13 +12,12 @@ void process_instruction();
 // MANEJO DE POSICIONES DE .DATA INVÁLIDAS
 // MANEJO DE POSICIONES DE .TEXT INVÁLIDAS
 
-// tested:
-void adds_immediate(uint32_t pars);
-void adds_extended(uint32_t pars);
-void subs_immediate(uint32_t pars);
-void subs_extended_register(uint32_t pars);
+void adds_immediate(uint32_t instruction);
+void adds_extended(uint32_t instruction);
+void subs_immediate(uint32_t instruction);
+void subs_extended_register(uint32_t instruction);
 void hlt(uint32_t instruction);
-void ands_shifted(uint32_t pars);
+void ands_shifted(uint32_t instruction);
 void eor_shifted_register(uint32_t instruction);
 void orr_shifted(uint32_t instruction);
 void b_cond(uint32_t instruction);
@@ -35,11 +35,7 @@ void ldurb(uint32_t instruction);
 void ldur(uint32_t instruction);
 void ldurh(uint32_t instruction);
 void add_immediate(uint32_t instruction);
-
-
-// to test: SUS
 void add_extended(uint32_t instruction);
-
 
 
 void update_flags(uint64_t result);
@@ -81,7 +77,6 @@ void process_instruction(){
         {0b10010001<<24, add_immediate},
         {0b10001011000<<21, add_extended},
     };
-    // 10001011000
 
     uint32_t masks[] = {
         0b1111111111111111111111<<10,
@@ -102,27 +97,29 @@ void process_instruction(){
                 return;
             }
         }
-    }    
+    }  
+    printf("Error: Instruction not found\n");
+    exit(1);  
 }
 
-void subs_immediate(uint32_t pars) {
-    char shift = (pars & 0b11<<22) >> 22;
-    short imm12 = (pars & 0b111111111111<<10)>>10;
+void subs_immediate(uint32_t instruction) {
+    char shift = (instruction & 0b11<<22) >> 22;
+    short imm12 = (instruction & 0b111111111111<<10)>>10;
     if (shift) {
         imm12 = imm12 << 12;
     }
-    short Rn = (pars & 0b11111<<5)>>5;
-    short Rd = pars & 0b11111;
+    short Rn = (instruction & 0b11111<<5)>>5;
+    short Rd = instruction & 0b11111;
 
     NEXT_STATE.REGS[Rd] = (CURRENT_STATE.REGS[Rn]) - imm12;
 
     update_flags(NEXT_STATE.REGS[Rd]);
 }
 
-void subs_extended_register(uint32_t pars) {
-    short Rm = (pars & 0b11111<<16)>>16;
-    short Rn = (pars & 0b11111<<5)>>5;
-    short Rd = pars & 0b11111;
+void subs_extended_register(uint32_t instruction) {
+    short Rm = (instruction & 0b11111<<16)>>16;
+    short Rn = (instruction & 0b11111<<5)>>5;
+    short Rd = instruction & 0b11111;
 
     NEXT_STATE.REGS[Rd] = (CURRENT_STATE.REGS[Rn]) - (CURRENT_STATE.REGS[Rm]);
     
@@ -201,34 +198,22 @@ void b_cond(uint32_t instruction){
 
     switch (cond) {
         case 0b0000: // EQ 
-            if (CURRENT_STATE.FLAG_Z) {
-                NEXT_STATE.PC += offset-4;
-            }
+            jump_if(offset, CURRENT_STATE.FLAG_Z);
             break;
         case 0b0001: // NE
-            if (!(CURRENT_STATE.FLAG_Z)) {
-                NEXT_STATE.PC += offset-4;
-            }
+            jump_if(offset, !CURRENT_STATE.FLAG_Z);
             break;
         case 0b1100: // GT
-            if (!(CURRENT_STATE.FLAG_N) && !(CURRENT_STATE.FLAG_Z)) {
-                NEXT_STATE.PC += offset-4;
-            }
+            jump_if(offset, !(CURRENT_STATE.FLAG_N) && !(CURRENT_STATE.FLAG_Z));
             break;
         case 0b1011: // LT
-            if ((CURRENT_STATE.FLAG_N) && !(CURRENT_STATE.FLAG_Z)) {
-                NEXT_STATE.PC += offset-4;
-            }
+            jump_if(offset, (CURRENT_STATE.FLAG_N) && !(CURRENT_STATE.FLAG_Z));
             break;
         case 0b1010: // GE
-            if (!(CURRENT_STATE.FLAG_N) || (CURRENT_STATE.FLAG_Z)) {
-                NEXT_STATE.PC += offset-4;
-            }
+            jump_if(offset, !(CURRENT_STATE.FLAG_N) || (CURRENT_STATE.FLAG_Z));
             break;
         case 0b1101: // LE
-            if ((CURRENT_STATE.FLAG_N) || (CURRENT_STATE.FLAG_Z)) {
-                NEXT_STATE.PC += offset-4;
-            }
+            jump_if(offset, (CURRENT_STATE.FLAG_N) || (CURRENT_STATE.FLAG_Z));
             break;
     }
 }
@@ -305,7 +290,6 @@ void ldur(uint32_t instruction){
 void ldurb(uint32_t instruction){
     uint32_t Rt = (instruction & 0b11111);
     uint32_t Rn = (instruction & 0b11111<<5)>>5;
-    int16_t imm9;
     int64_t offset = sign_extend(instruction>>12, 8);
     int64_t address = CURRENT_STATE.REGS[Rn] + offset;
     int32_t lower_data_bits = mem_read_32(address) & 0xFF;
