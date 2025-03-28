@@ -14,8 +14,6 @@ void adds_extended(uint32_t pars);
 void subs_immediate(uint32_t pars);
 void subs_extended_register(uint32_t pars);
 void hlt(uint32_t instruction);
-// cmp immediate
-// cmp extended_register
 void ands_shifted(uint32_t pars);
 void eor_shifted_register(uint32_t instruction);
 void orr_shifted(uint32_t instruction);
@@ -31,177 +29,75 @@ void mul(uint32_t instruction);
 // to test:
 void cbz(uint32_t instruction);   
 void cbnz(uint32_t instruction); 
-
-void ldur(uint32_t instruction);
-void ldurb(uint32_t instruction);
-void ldurh(uint32_t instruction);
 void b(uint32_t instruction);
 void br(uint32_t instruction);
 void add_immediate(uint32_t instruction);
 void add_extended(uint32_t instruction);
+void ldur(uint32_t instruction);
+void ldurb(uint32_t instruction);
+void ldurh(uint32_t instruction);
+
 
 
 void update_flags(uint64_t result);
 int64_t sign_extend(int64_t value, int64_t idx);
 
-// typedef struct instruction_t {
-//     uint32_t opcode;
-//     void (*function)(uint32_t);
-// } instruction_t;
+typedef struct instruction_t {
+    uint32_t opcode;
+    void (*function)(uint32_t);
+} instruction_t;
 
 void process_instruction(){
-    /* execute one instruction here. You should use CURRENT_STATE and modify
-    * values in NEXT_STATE. You can call mem_read_32() and mem_write_32() to
-    * access memory. 
-    * */
-
     uint64_t PC = CURRENT_STATE.PC;
     uint32_t instruction = mem_read_32(PC);
 
-    // printf("Instruction: %x\n", instruction);
+    instruction_t instructions[] = {
+        {0b10110001<<24, adds_immediate},
+        {0b10101011000<<21, adds_extended},
+        {0b11110001<<24, subs_immediate},
+        {0b11101011000<<21, subs_extended_register},
+        {0b11010100010<<21, hlt},
+        {0b11101010000<<21, ands_shifted},
+        {0b11001010000<<21, eor_shifted_register},
+        {0b10101010000<<21, orr_shifted},
+        {0b000101<<26, b},
+        {0b1101011000011111000000<<10, br},
+        {0b01010100<<24, b_cond},
+        {0b1101001101<<22, logical_shift_immediate},
+        {0b11111000010<<21, ldur},
+        {0b00111000010<<21, ldurb},
+        {0b01111000010<<21, ldurh},
+        {0b11111000000<<21, stur},
+        {0b00111000000<<21, sturb},
+        {0b01111000000<<21, sturh},
+        {0b11010010100<<21, movz},
+        {0b10011011000<<21, mul},
+        {0b10110100<<24, cbz},
+        {0b10110101<<24, cbnz},
+        {0b10010001<<24, add_immediate},
+        {0b10001011000<<21, add_extended},
+    };
 
-//  Masks
-    uint32_t mask_22bits = 0b1111111111111111111111<<10;
-    uint32_t mask_11bits = 0b11111111111<<21;
-    uint32_t mask_8bits = 0b11111111<<24;
-    uint32_t mask_6bits = 0b111111<<26;
-    uint32_t mask_9bits = 0b111111111<<23;
+    uint32_t masks[] = {
+        0b1111111111111111111111<<10,
+        0b11111111111<<21,
+        0b1111111111<<22,
+        0b11111111<<24,
+        0b111111<<26,
+    };
 
-//  Opcodes
-    uint32_t adds_extended_opcode = 0b10101011000<<21;
-    uint32_t adds_immediate_opcode = 0b10110001<<24;
-    uint32_t subs_immediate_opcode = 0b11110001<<24;
-    uint32_t subs_extended_register_opcode = 0b11101011000<<21;
-    uint32_t hlt_opcode = 0b11010100010<<21;
-    uint32_t ands_shifted_opcode = 0b11101010000<<21;
-    uint32_t eor_shifted_register_opcode = 0b11001010000<<21;
-    uint32_t orr_opcode = 0b10101010000<<21;
-    uint32_t b_opcode = 0b000101<<26;
-    uint32_t br_opcode = 0b1101011000011111000000<<10;
-    uint32_t b_cond_opcode = 0b01010100<<24;
-    uint32_t logical_shift_immediate_opcode = 0b110100110<<23;
-    uint32_t stur_opcode = 0b11111000000<<21;
-    uint32_t sturb_opcode = 0b00111000000<<21;
-    uint32_t sturh_opcode = 0b01111000000<<21;
-    uint32_t ldur_opcode = 0b11111000010<<21;
-    uint32_t movz_opcode = 0b11010010100<<21;
-    uint32_t mul_opcode =  0b10011011000<<21;
-    uint32_t cbz_opcode = 0b10110100<<24;
-    uint32_t cbnz_opcode = 0b10110101<<24;
-    uint32_t add_immediate_opcode = 0b10010001<<24;
-    uint32_t add_extended_opcode = 0b10001011001<<21;
-    uint32_t ldurb_opcode = 0b00111000010<<21;
-    uint32_t ldurh_opcode = 0b01111000010<<21;
+    int num_instructions = sizeof(instructions) / sizeof(instructions[0]);
 
-    char program_counter_increase = 1;
-
-
-    if ((instruction & mask_8bits) == subs_immediate_opcode){
-        subs_immediate(instruction); 
-    }
-
-    if ((instruction & mask_11bits) == subs_extended_register_opcode){
-        subs_extended_register(instruction);
-    }
-
-    if ((instruction & mask_11bits) == adds_extended_opcode){
-        adds_extended(instruction);
-    }
-
-    if ((instruction & mask_8bits) == adds_immediate_opcode) {
-        adds_immediate(instruction);
-    }
-
-    if ((instruction & mask_11bits) == hlt_opcode){
-        hlt(instruction);
-    }
-
-    if ((instruction & mask_11bits) == ands_shifted_opcode){
-        ands_shifted(instruction);
-    }
-
-    if ((instruction & mask_11bits) == orr_opcode){
-        orr_shifted(instruction);
-    }
-
-    if ((instruction & mask_6bits) == b_opcode){
-        b(instruction);
-        program_counter_increase = 0;
-    }
-
-    if ((instruction & mask_11bits) == eor_shifted_register_opcode){
-        eor_shifted_register(instruction);
-    }
-
-    if ((instruction & mask_22bits)== br_opcode){
-        br(instruction);
-        program_counter_increase = 0;
-    }
-
-    if ((instruction & mask_8bits) == b_cond_opcode){
-        b_cond(instruction);
-        program_counter_increase = 0;
-    }
-
-    if ((instruction & mask_9bits) == logical_shift_immediate_opcode){
-        logical_shift_immediate(instruction);
-    }
-
-    if ((instruction & mask_11bits) == stur_opcode){
-        stur(instruction);
-    }
-
-    if ((instruction & mask_11bits) == movz_opcode){
-        movz(instruction);
-    }
-
-    if ((instruction & mask_11bits) == mul_opcode) {
-        mul(instruction);
-    }
-
-    if ((instruction & mask_11bits) == sturb_opcode){
-        sturb(instruction);
-    }
-    
-    if ((instruction & mask_11bits) == sturh_opcode){
-        sturh(instruction);
-    }
-    
-    if ((instruction & mask_11bits) == ldur_opcode){
-        ldur(instruction);
-    }
-
-    if ((instruction & mask_8bits) == cbz_opcode){
-        cbz(instruction);
-        program_counter_increase = 0;
-    }
-    
-    if ((instruction & mask_8bits) == cbnz_opcode){
-        cbnz(instruction);
-        program_counter_increase = 0;
-    }
-
-    if ((instruction & mask_8bits) == add_immediate_opcode){
-        add_immediate(instruction);
-    }
-
-    if ((instruction & mask_11bits) == add_extended_opcode){
-        add_extended(instruction);
-    }
-
-    if ((instruction & mask_11bits) == ldurb_opcode){
-        ldurb(instruction);
-    }
-
-    if ((instruction & mask_11bits) == ldurh_opcode){
-        ldurh(instruction);
-    }
-
-    if (program_counter_increase) {
-        NEXT_STATE.PC += 4;
-    }
-
-    NEXT_STATE.REGS[31] = CURRENT_STATE.REGS[31];
+    for (int mask = 0; mask < 5; mask++) {
+        for (int i = 0; i < num_instructions; i++) {    
+            if ((instruction & masks[mask]) == instructions[i].opcode) {
+                instructions[i].function(instruction);
+                NEXT_STATE.PC += 4;
+                NEXT_STATE.REGS[31] = CURRENT_STATE.REGS[31];
+                return;
+            }
+        }
+    }    
 }
 
 void subs_immediate(uint32_t pars) {
@@ -220,8 +116,6 @@ void subs_immediate(uint32_t pars) {
 
 void subs_extended_register(uint32_t pars) {
     short Rm = (pars & 0b11111<<16)>>16;
-    short option = (pars & 0b111<<13)>>13; 
-    short imm3 = (pars & 0b111>>10)>>10;
     short Rn = (pars & 0b11111<<5)>>5;
     short Rd = pars & 0b11111;
 
@@ -233,10 +127,8 @@ void subs_extended_register(uint32_t pars) {
 void adds_extended(uint32_t instruction){
     uint32_t Rd = (instruction & 0b11111);
     uint32_t Rn = (instruction & 0b11111<<5)>>5;
-    uint64_t imm3 = (instruction & 0b111<<10)>>10;
-    uint32_t option = (instruction & 0b111>>13)<<13;
-    uint32_t Rm = (instruction & 0b11111>>16)<<16;
-    uint64_t res = Rn + Rm;
+    uint32_t Rm = (instruction & 0b11111<<16)>>16;
+    uint64_t res = CURRENT_STATE.REGS[Rn] + CURRENT_STATE.REGS[Rm];
     NEXT_STATE.REGS[Rd] = res;
     update_flags(res);
 }
@@ -305,36 +197,33 @@ void b_cond(uint32_t instruction){
     switch (cond) {
         case 0b0000: // EQ 
             if (CURRENT_STATE.FLAG_Z) {
-                NEXT_STATE.PC += offset;
+                NEXT_STATE.PC += offset-4;
             }
             break;
         case 0b0001: // NE
             if (!(CURRENT_STATE.FLAG_Z)) {
-                NEXT_STATE.PC += offset;
+                NEXT_STATE.PC += offset-4;
             }
             break;
         case 0b1100: // GT
             if (!(CURRENT_STATE.FLAG_N) && !(CURRENT_STATE.FLAG_Z)) {
-                NEXT_STATE.PC += offset;
+                NEXT_STATE.PC += offset-4;
             }
             break;
         case 0b1011: // LT
             if ((CURRENT_STATE.FLAG_N) && !(CURRENT_STATE.FLAG_Z)) {
-                NEXT_STATE.PC += offset;
+                NEXT_STATE.PC += offset-4;
             }
             break;
         case 0b1010: // GE
             if (!(CURRENT_STATE.FLAG_N) || (CURRENT_STATE.FLAG_Z)) {
-                NEXT_STATE.PC += offset;
+                NEXT_STATE.PC += offset-4;
             }
             break;
         case 0b1101: // LE
             if ((CURRENT_STATE.FLAG_N) || (CURRENT_STATE.FLAG_Z)) {
-                NEXT_STATE.PC += offset;
+                NEXT_STATE.PC += offset-4;
             }
-            break;
-        default:
-            NEXT_STATE.PC += 4;
             break;
     }
 }
@@ -484,14 +373,10 @@ void add_immediate(uint32_t instruction){
 void add_extended(uint32_t instruction){
     uint32_t Rd = (instruction & 0b11111);
     uint32_t Rn = (instruction & 0b11111<<5)>>5;
-    uint64_t imm3 = (instruction & 0b111<<10)>>10;
-    uint32_t option = (instruction & 0b111>>13)<<13;
     uint32_t Rm = (instruction & 0b11111>>16)<<16;
-    uint64_t res = Rn + Rm;
+    uint64_t res = CURRENT_STATE.REGS[Rn] + CURRENT_STATE.REGS[Rm];
     NEXT_STATE.REGS[Rd] = res;
 }
-
-
 
 void update_flags(uint64_t res) {
     NEXT_STATE.FLAG_N = (res >> 63) & 1;
