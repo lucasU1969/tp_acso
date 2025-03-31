@@ -224,7 +224,6 @@ void mul(uint32_t instruction) {
     uint8_t Rd = instruction & 0b11111;
     
     NEXT_STATE.REGS[Rd] = CURRENT_STATE.REGS[Rn] * CURRENT_STATE.REGS[Rm];
-    update_flags(NEXT_STATE.REGS[Rd]);
 }
 
 
