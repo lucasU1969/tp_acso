@@ -62,7 +62,7 @@ void process_instruction(){
             if ((instruction & masks[mask]) == instructions[i].opcode) {
                 instructions[i].function(instruction);
                 NEXT_STATE.PC += 4;
-                NEXT_STATE.REGS[31] = CURRENT_STATE.REGS[31];
+                NEXT_STATE.REGS[31] = 0;
                 return;
             }
         }

@@ -72,7 +72,6 @@ void orr_shifted(uint32_t instruction){
     uint32_t Rm = (instruction & 0b11111<<16)>>16;
     uint64_t res = CURRENT_STATE.REGS[Rn] | CURRENT_STATE.REGS[Rm];
     NEXT_STATE.REGS[Rd] = res;
-    update_flags(res);
 }
 
 void eor_shifted_register(uint32_t instruction) {
