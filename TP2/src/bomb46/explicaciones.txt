@@ -1,0 +1,33 @@
+Fase 1: 
+
+Es lo que hay en la posición de memoria que se compara con el input.
+  401def:	48 8d 35 6a 7c 0c 00 	lea    rsi,[rip+0xc7c6a]		;rsi carga la posición de memoria donde está el string que se va a comparar con el input.
+  
+Fase 2: 
+
+El input se tiene que poder parsear a dos números. input1 + input2 - 32 tiene que tener 11 bits en 1 y el xor entre input1 e input2 tiene que ser negativo.
+
+  401e58:	48 89 fb             	mov    rbx,rdi                      ; se mueve el parámetro input (lo que se escribe) al registro rbx
+  401e5b:	be 20 00 00 00       	mov    esi,0x20                     ; se guarda en esi el valor 32
+  401e60:	e8 5b f3 ff ff       	call   4011c0 <_init+0x1c0>         ; llamada a la rutina dada en la posición absoluta 4011c0
+  401e65:	48 89 c5             	mov    rbp,rax                      ; si no hay un espacio en el input entonces explota la bomba
+  401e7a:	e8 21 4a 00 00       	call   4068a0 <__strtol>            ; parsea el primer número y lo convierte a entero -> ebx
+  401e8f:	e8 0c 4a 00 00       	call   4068a0 <__strtol>            ; parsea el segundo número y lo convierte a entero -> edx
+  401e9c:	e8 6a ff ff ff       	call   401e0b <misterio>            ; llama a la función misterio(input1 + input2 - 32, input_1, input_2)
+  401e2a:	01 c2                	add    edx,eax                      ; edx cuenta la cantidad de 1 en input_1 + input_2 - 32
+  401e32:	75 ef                	jne    401e23 <misterio+0x18>       ; se ejecuta hasta que ecx sea 20 (20 veces)
+  401e34:	83 fa 0b             	cmp    edx,0xb                      ; verifica que la suma de bits en 1 de eax (input_1 + input_2 - 32) sea 11
+  401e39:	31 eb                	xor    ebx,ebp                      ; se hace un xor entre input_1 e input_2
+  401e3b:	78 05                	js     401e42 <misterio+0x37>	     ; si la flag de signo está activa entonces no explota la bomba.
+
+
+Fase 3: 
+
+Se parsea el input a un "%s %d" en sscanf() y si no es posible parsear explota la bomba. Se llama a readlines que devuelve un puntero a char* que contiene todas las palabras de palabras.txt. Se hace cuenta en base al str de input, esta operación realiza una búsqueda binaria sobre el arreglo de punteros a char hasta encontrar la palabra ingresada. Si no se encuentra explota y si lo hace devuelve un valor que, de ser igual al ingresado termina la fase. Despues de entender esto, pasé como input una palabra de la lista y ví con qué número se comparaba con el input y en la proxima ejecución de la bomba le pasé dicho número.
+
+  402053:	e8 b8 54 00 00       	call   407510 <__isoc99_sscanf>	; parsea el input
+  402058:	83 f8 02             	cmp    eax,0x2 			; si no tiene un string y un número entonces explota la bomba
+  402062:	e8 46 fe ff ff       	call   401ead <readlines>		; se llama a la función readlines
+  401ed0:	48 8d 35 53 58 0c 00 	lea    rsi,[rip+0xc5853]		; modo de lectura
+  401ed7:	48 8d 3d ae 51 0c 00 	lea    rdi,[rip+0xc51ae]    		; nombre del archivo
+  401f57:	e8 94 55 00 00       	call   4074f0 <__getline>		; lee una línea del archivo
