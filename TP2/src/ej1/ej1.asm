@@ -30,53 +30,41 @@ extern strcat
 
 ; string_proc_list* string_proc_list_create_asm(void)
 string_proc_list_create_asm:
-    ; Prólogo
     push rbp
     mov rbp, rsp
     
-    ; Llamar a malloc para crear la estructura de la lista
-    mov rdi, string_proc_list_size   ; Tamaño de la estructura
+    mov rdi, string_proc_list_size
     call malloc
     
-    ; Comprobar si malloc tuvo éxito
     test rax, rax
     jz .error
     
-    ; Inicializar first y last a NULL
     mov qword [rax + first_offset], NULL
     mov qword [rax + last_offset], NULL
     
-    ; Epílogo
     mov rsp, rbp
     pop rbp
     ret
     
 .error:
-    ; En caso de error, retornar NULL
     mov rax, NULL
     mov rsp, rbp
     pop rbp
     ret
 
-; string_proc_node* string_proc_node_create_asm(uint8_t type, char* hash)
 string_proc_node_create_asm:
-    ; Prólogo
     push rbp
     mov rbp, rsp
     
-    ; Guardar los argumentos
     push rdi    ; type
     push rsi    ; hash
     
-    ; Llamar a malloc para crear el nodo
     mov rdi, string_proc_node_size
     call malloc
     
-    ; Restaurar los argumentos
     pop rsi     ; hash
     pop rdi     ; type
     
-    ; Comprobar si malloc tuvo éxito
     test rax, rax
     jz .error
     
@@ -86,13 +74,11 @@ string_proc_node_create_asm:
     mov qword [rax + hash_offset], rsi     ; node->hash = hash
     mov byte [rax + type_offset], dil      ; node->type = type
     
-    ; Epílogo
     mov rsp, rbp
     pop rbp
     ret
     
 .error:
-    ; En caso de error, retornar NULL
     mov rax, NULL
     mov rsp, rbp
     pop rbp
@@ -100,11 +86,9 @@ string_proc_node_create_asm:
 
 ; void string_proc_list_add_node_asm(string_proc_list* list, uint8_t type, char* hash)
 string_proc_list_add_node_asm:
-    ; Prólogo
     push rbp
     mov rbp, rsp
     
-    ; Guardar los registros que usaremos
     push rbx
     push r12
     push r13
@@ -124,12 +108,11 @@ string_proc_list_add_node_asm:
     jz .end
     
     ; Crear un nuevo nodo
-    movzx rdi, r12b   ; type (con extensión de ceros)
+    movzx rdi, r12b   ; type
     mov rsi, r13      ; hash
     call string_proc_node_create_asm
     mov r14, rax      ; Guardar el nuevo nodo en r14
     
-    ; Verificar si la creación del nodo tuvo éxito
     test r14, r14
     jz .end
     
@@ -157,7 +140,6 @@ string_proc_list_add_node_asm:
     mov [rbx + last_offset], r14
     
 .end:
-    ; Epílogo
     pop r14
     pop r13
     pop r12
@@ -168,45 +150,37 @@ string_proc_list_add_node_asm:
 
 ; char* string_proc_list_concat_asm(string_proc_list* list, uint8_t type, char* hash)
 string_proc_list_concat_asm:
-    ; Prólogo
     push rbp
     mov rbp, rsp
     
-    ; Guardar los registros que usaremos
     push rbx
     push r12
     push r13
     push r14
     push r15
-    sub rsp, 8      ; Alinear pila a 16 bytes
+    sub rsp, 8      ; Alinear pila
     
     ; Guardar los argumentos
     mov rbx, rdi    ; list
     mov r12b, sil   ; type
     mov r13, rdx    ; hash
     
-    ; Verificar si list es NULL
     test rbx, rbx
     jz .return_null
     
-    ; Verificar si hash es NULL
     test r13, r13
     jz .return_null
     
-    ; Preparar para duplicar el hash inicial
     mov rdi, r13
     call strlen
     
-    ; Longitud + 1 para el terminador nulo
     lea rdi, [rax + 1]
     call malloc
-    mov r14, rax    ; r14 = result
+    mov r14, rax
     
-    ; Verificar si malloc tuvo éxito
     test r14, r14
     jz .return_null
     
-    ; Copiar el hash inicial a result
     mov rdi, r14
     mov rsi, r13
     call strcpy
@@ -216,7 +190,7 @@ string_proc_list_concat_asm:
     
     ; Bucle para recorrer los nodos
 .loop:
-    ; Verificar si hemos llegado al final de la lista
+    ; Verificar si se llegó al final de la lista
     test r15, r15
     jz .end_loop
     
@@ -230,7 +204,6 @@ string_proc_list_concat_asm:
     mov rsi, [r15 + hash_offset]     ; node->hash
     call str_concat
     
-    ; Liberar el result anterior
     mov rdi, r14
     push rax                         ; Guardar el nuevo result
     call free
@@ -250,7 +223,6 @@ string_proc_list_concat_asm:
     mov rax, NULL
     
 .cleanup:
-    ; Epílogo
     add rsp, 8      ; Deshacer alineamiento
     pop r15
     pop r14
