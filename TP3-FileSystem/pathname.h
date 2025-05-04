@@ -3,6 +3,9 @@
 
 #include "unixfilesystem.h"
 
+
+#include "direntv6.h"
+
 /**
  * Returns the inode number associated with the specified pathname.  This need only
  * handle absolute paths.  Returns a negative number (-1 is fine) if an error is 
