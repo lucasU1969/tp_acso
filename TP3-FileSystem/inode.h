@@ -22,4 +22,8 @@ int inode_indexlookup(struct unixfilesystem *fs, struct inode *inp, int blockNum
  */
 int inode_getsize(struct inode *inp);
 
+/**
+ * Returns the amount of used bytes in the given block.
+ */
+int used_bytes_in_block(struct inode *inp, int blockNum);
 #endif // _INODE_
