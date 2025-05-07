@@ -8,42 +8,35 @@
 #include "unixfilesystem.h"
 #include "ino.h"
 
-/**
- * TODO
- */
-int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp) {
-    if (inumber < 1 || !(inp)) return -1;
 
-    uint16_t s_isize = (fs -> superblock).s_isize;                  // size in blocks of I list
-    int32_t  size_of_inode = sizeof(struct inode);                  // size of the inode struct
-    int32_t bytes_offset = size_of_inode*(inumber-1);               // offset measured in bytes where the inode starts
-    int32_t blocks_offset = bytes_offset / DISKIMG_SECTOR_SIZE;     //offset measured in blocks where the inode starts
-    if (s_isize <= blocks_offset) return -1;                        // the inode number is invalid
+int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp) {
+    if (inumber < 1 || !(inp) || !(fs)) return -1;
+
+    int32_t  size_of_inode = sizeof(struct inode);                                          // size of the inode struct
+    int32_t bytes_offset = size_of_inode*(inumber-1);                                       // offset measured in bytes where the inode starts
+    int32_t blocks_offset = bytes_offset / DISKIMG_SECTOR_SIZE;                             // offset measured in blocks where the inode starts
+    if ((fs -> superblock).s_isize <= blocks_offset) return -1;                             // the inode number is invalid
 
     int32_t bytes_offset_wrt_block = bytes_offset - (blocks_offset * DISKIMG_SECTOR_SIZE);
-
     int32_t absolute_block_idx = INODE_START_SECTOR + blocks_offset;
-
     int8_t* block_data = (int8_t*) malloc(DISKIMG_SECTOR_SIZE);
     if (!block_data) return -1;
 
-    int result =  diskimg_readsector(fs->dfd, absolute_block_idx, block_data); 
-    if (result < 0) {
+    int result =  diskimg_readsector(fs->dfd, absolute_block_idx, block_data);              
+    if (result < 0) {                                                                       // check if the read fails
         free(block_data);  
         return -1;
     }
-    memcpy(inp, block_data + bytes_offset_wrt_block, size_of_inode);
+    memcpy(inp, block_data + bytes_offset_wrt_block, size_of_inode);                        // copy mem from disk to the pos pointed by inp
     free(block_data);
     return 0; 
-}
+}   
 
-/**
- * TODO
- */
+
 int inode_indexlookup(struct unixfilesystem *fs, struct inode *inp, int blockNum) {  
-    if (!(inp->i_mode & IALLOC) || blockNum < 0) return -1;
+    if (!(inp->i_mode & IALLOC) || blockNum < 0 || !(fs)) return -1;
 
-    if (!(inp->i_mode & ILARG)) {
+    if (!(inp->i_mode & ILARG)) {                                                           // directo (cada bloque contiene los datos)
         if (blockNum > 7) return -1;
         return inp->i_addr[blockNum];
     }
@@ -55,18 +48,13 @@ int inode_indexlookup(struct unixfilesystem *fs, struct inode *inp, int blockNum
     if (idx_in_i_addr < 7) {
         int idx_in_block = blockNum % pointers_per_block;
 
-        if (inp->i_addr[idx_in_i_addr] == 0) return -1;  // bloque de indirección no asignado
+        if ((inp -> i_addr)[idx_in_i_addr] == 0) return -1;  // bloque de indirección no asignado
 
         int16_t* block = (int16_t*) malloc(DISKIMG_SECTOR_SIZE);
         if (!block) return -1;
 
         int result = diskimg_readsector(fs->dfd, inp->i_addr[idx_in_i_addr], block);
-        if (result < 0) {
-            free(block);
-            return -1;
-        }
-
-        if (idx_in_block >= pointers_per_block) {  // seguridad por si hay corrupción
+        if ((result < 0) || (idx_in_block >= pointers_per_block)) {
             free(block);
             return -1;
         }
@@ -102,13 +90,7 @@ int inode_indexlookup(struct unixfilesystem *fs, struct inode *inp, int blockNum
         return -1;
     }
 
-    if (diskimg_readsector(fs->dfd, indirect1[idx_in_1block], indirect2) < 0) {
-        free(indirect1);
-        free(indirect2);
-        return -1;
-    }
-
-    if (idx_in_2block >= pointers_per_block) {
+    if ((diskimg_readsector(fs->dfd, indirect1[idx_in_1block], indirect2) < 0) || (idx_in_2block >= pointers_per_block)) {
         free(indirect1);
         free(indirect2);
         return -1;
