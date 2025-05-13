@@ -8,9 +8,8 @@
 #include <assert.h>
 
 #include "direntv6.h"
-/**
- * TODO
- */
+
+
 int pathname_lookup(struct unixfilesystem *fs, const char *pathname) {
     if (pathname == NULL || pathname[0] != '/') return -1;
 

@@ -9,6 +9,8 @@
 #include "ino.h"
 
 
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
 int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp) {
     if (inumber < 1 || !(inp) || !(fs)) return -1;
 
@@ -21,7 +23,7 @@ int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp) {
     int32_t absolute_block_idx = INODE_START_SECTOR + blocks_offset;
     int8_t* block_data = (int8_t*) malloc(DISKIMG_SECTOR_SIZE);
     if (!block_data) return -1;
-
+    
     int result =  diskimg_readsector(fs->dfd, absolute_block_idx, block_data);              
     if (result < 0) {                                                                       // check if the read fails
         free(block_data);  
@@ -30,7 +32,7 @@ int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp) {
     memcpy(inp, block_data + bytes_offset_wrt_block, size_of_inode);                        // copy mem from disk to the pos pointed by inp
     free(block_data);
     return 0; 
-}   
+}
 
 
 int inode_indexlookup(struct unixfilesystem *fs, struct inode *inp, int blockNum) {  
@@ -42,63 +44,53 @@ int inode_indexlookup(struct unixfilesystem *fs, struct inode *inp, int blockNum
     }
 
     int pointers_per_block = DISKIMG_SECTOR_SIZE / sizeof(uint16_t);
-    int idx_in_i_addr = blockNum / pointers_per_block;
+    int idx_in_i_addr = min(blockNum / pointers_per_block, 7);
 
-    // Indirección simple
-    if (idx_in_i_addr < 7) {
-        int idx_in_block = blockNum % pointers_per_block;
+    int idx_in_block_simple = blockNum % pointers_per_block;
 
-        if ((inp -> i_addr)[idx_in_i_addr] == 0) return -1;  // bloque de indirección no asignado
+    if (!(inp -> i_addr [idx_in_i_addr]) || 
+        (blockNum >= (pointers_per_block*(7 + pointers_per_block))) || 
+        ( inode_getsize(inp) < blockNum * DISKIMG_SECTOR_SIZE)) return -1;                  // el bloque no está asignado o es mayor al tamaño del archivo o el maximo posible.
 
-        int16_t* block = (int16_t*) malloc(DISKIMG_SECTOR_SIZE);
-        if (!block) return -1;
+    int16_t* si_block = (int16_t*) malloc(DISKIMG_SECTOR_SIZE); 
+    if (!si_block) return -1;
+    
+    int result_si = diskimg_readsector(fs-> dfd, inp -> i_addr[idx_in_i_addr], si_block);   // cargo el bloque en la porción de memoria reservada por malloc.
+    if (result_si<0){
+        free(si_block);
+        return -1;
+    }
 
-        int result = diskimg_readsector(fs->dfd, inp->i_addr[idx_in_i_addr], block);
-        if ((result < 0) || (idx_in_block >= pointers_per_block)) {
-            free(block);
-            return -1;
-        }
-
-        int block_abs_idx = block[idx_in_block];
-        free(block);
+    if (idx_in_i_addr < 7) {                                                                // estoy en el caso de indirección simple
+        int block_abs_idx = si_block[idx_in_block_simple];
+        free(si_block);
         return block_abs_idx;
     }
 
-    // Indirección doble
-    int remaining = blockNum - 7 * pointers_per_block;
-    int idx_in_1block = remaining / pointers_per_block;
-    int idx_in_2block = remaining % pointers_per_block;
+    // indirección doble
+    int idx_in_si_block = (blockNum - 7*pointers_per_block) / pointers_per_block; 
+    int idx_in_di_block = (blockNum - 7*pointers_per_block) % pointers_per_block;
 
-    if (inp->i_addr[7] == 0) return -1;  // bloque de doble indirección no asignado
-
-    int16_t* indirect1 = (int16_t*) malloc(DISKIMG_SECTOR_SIZE);
-    if (!indirect1) return -1;
-
-    if (diskimg_readsector(fs->dfd, inp->i_addr[7], indirect1) < 0) {
-        free(indirect1);
+    if (!(si_block[idx_in_si_block])) {                                                     // no hay dato en el bloque
+        free(si_block);
         return -1;
     }
 
-    if (idx_in_1block >= pointers_per_block || indirect1[idx_in_1block] == 0) {
-        free(indirect1);
+    int16_t* di_block = (int16_t*) malloc(DISKIMG_SECTOR_SIZE);
+    if (!(di_block)) {
+        free(si_block);
         return -1;
     }
 
-    int16_t* indirect2 = (int16_t*) malloc(DISKIMG_SECTOR_SIZE);
-    if (!indirect2) {
-        free(indirect1);
+    if ((diskimg_readsector(fs->dfd, si_block[idx_in_si_block], di_block) < 0)) {
+        free(si_block);
+        free(di_block);
         return -1;
     }
 
-    if ((diskimg_readsector(fs->dfd, indirect1[idx_in_1block], indirect2) < 0) || (idx_in_2block >= pointers_per_block)) {
-        free(indirect1);
-        free(indirect2);
-        return -1;
-    }
-
-    int block_abs_idx = indirect2[idx_in_2block];
-    free(indirect1);
-    free(indirect2);
+    int block_abs_idx = di_block[idx_in_di_block];
+    free(si_block);
+    free(di_block);
     return block_abs_idx;
 }
 
