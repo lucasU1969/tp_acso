@@ -14,10 +14,10 @@
 int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp) {
     if (inumber < 1 || !(inp) || !(fs)) return -1;
 
-    int32_t  size_of_inode = sizeof(struct inode);                                          // size of the inode struct
-    int32_t bytes_offset = size_of_inode*(inumber-1);                                       // offset measured in bytes where the inode starts
-    int32_t blocks_offset = bytes_offset / DISKIMG_SECTOR_SIZE;                             // offset measured in blocks where the inode starts
-    if ((fs -> superblock).s_isize <= blocks_offset) return -1;                             // the inode number is invalid
+    int32_t  size_of_inode = sizeof(struct inode);                                          // tamaño inode struct
+    int32_t bytes_offset = size_of_inode*(inumber-1);                                       // offset en bytes de donde empieza el inode
+    int32_t blocks_offset = bytes_offset / DISKIMG_SECTOR_SIZE;                             // offset en bloques de donde empieza el inode
+    if ((fs -> superblock).s_isize <= blocks_offset) return -1;                             // el inumber es válido
 
     int32_t bytes_offset_wrt_block = bytes_offset - (blocks_offset * DISKIMG_SECTOR_SIZE);
     int32_t absolute_block_idx = INODE_START_SECTOR + blocks_offset;
@@ -25,11 +25,11 @@ int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp) {
     if (!block_data) return -1;
     
     int result =  diskimg_readsector(fs->dfd, absolute_block_idx, block_data);              
-    if (result < 0) {                                                                       // check if the read fails
+    if (result < 0) {                                                                       // verificar que el read no falle
         free(block_data);  
         return -1;
     }
-    memcpy(inp, block_data + bytes_offset_wrt_block, size_of_inode);                        // copy mem from disk to the pos pointed by inp
+    memcpy(inp, block_data + bytes_offset_wrt_block, size_of_inode);                        // copiar la memoria de disco a la sección apuntada por inp
     free(block_data);
     return 0; 
 }

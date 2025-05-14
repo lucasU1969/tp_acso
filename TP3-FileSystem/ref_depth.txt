@@ -1,4 +1,4 @@
-Disk -pi is 10240000 bytes (10000 KB)
+Disk -ip is 10240000 bytes (10000 KB)
 Superblock s_isize 225
 Superblock s_fsize 20000
 Superblock s_nfree 62
