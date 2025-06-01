@@ -6,7 +6,6 @@
 #include <string.h>
 
 
-// FALTAN CHEQUEOS
 
 void write_int_pipe(int fd, const int *buff);
 void read_int_pipe(int fd, int *buff);
@@ -30,13 +29,20 @@ int main(int argc, char **argv) {
 
 	int fds[n+1][2];  														// Tengo que crear n+1 pipes para comunicar entre todos los procesos. 
 	for (int i = 0; i <= n; i++) {
-		pipe(fds[i]);														// creo los pipes para la comunicación entre los procesos.
+		if (pipe(fds[i])<0) {												// creo los pipes para la comunicación entre los procesos.
+			perror("pipe");
+			exit(EXIT_FAILURE);
+		}														
 	}
 	
 	pid_t child_pid[n]; 													// para guardar los pids de los hijos.
 	int child_idx;
 	for (int i = 0; i < n; i++) {
 		pid = fork();
+		if (pid < 0) {
+			perror("fork");
+			exit(EXIT_FAILURE);
+		}
 		child_idx = (i - start + n) % n;									// se suma n porque en C la operación % puede devolver negativos (?)
 		child_pid[child_idx] = pid;
 		if (!pid) break;													// soy un hijo, entonces tengo que salir del while para no crear más procesos.
@@ -51,7 +57,15 @@ int main(int argc, char **argv) {
 
 		printf("%d\n", ret[0]);	
 
-		for (int i = 0; i < n; i++) waitpid(child_pid[i], &status, 0);		// espero a los hijos para liberar recursos
+		for (int i = 0; i < n; i++) {
+			if (waitpid(child_pid[i], &status, 0) < 0) {					// espero a los hijos para liberar recursos
+				perror("waitpid");
+				exit(EXIT_FAILURE);
+			}
+			if (!WIFEXITED(status)) {										// si alguno falla imprimo un mensaje de error
+				fprintf(stderr, "Proceso hijo %d no terminó normalmente", child_pid[i]);
+			}
+		}
 
 	} else {																// soy hijo
 		close_pipes(fds, child_idx, child_idx+1, n+1);						// cierro los pipes que no voy a usar
