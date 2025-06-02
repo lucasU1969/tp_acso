@@ -45,12 +45,14 @@ int main(int argc, char **argv) {
 		}
 		child_idx = (i - start + n) % n;									// se suma n porque en C la operación % puede devolver negativos (?)
 		child_pid[child_idx] = pid;
-		if (!pid) break;													// soy un hijo, entonces tengo que salir del while para no crear más procesos.
+		if (!pid) {
+			break;															// soy un hijo, entonces tengo que salir del while para no crear más procesos.
+		}
 	}
-
 	if (pid) {																// soy el padre
 		close_pipes(fds, n, 0, n+1);										// cierro los pipes que no voy a usar
-		write_int_pipe(fds[0][1], buffer);									// paso el dato al hijo que corresponde
+		
+		write_int_pipe(fds[0][1], buffer);									// paso el dato al hijo que corresponde, entiendo que esto no es necesario porque todos los hijos ya conocen el dato, pero asumí de la consigna que esta comunicación tenía que ser mediante pipes tambien.
 
 		int ret[1]; 
 		read_int_pipe(fds[n][0], ret); 										// leo el dato que me devuelve el último hijo
@@ -78,6 +80,10 @@ int main(int argc, char **argv) {
 	}
 	return 0;
 }
+
+
+
+
 
 
 void close_pipes(int fds[][2], int read, int write, int n) {
