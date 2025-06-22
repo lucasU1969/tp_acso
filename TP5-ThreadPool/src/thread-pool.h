@@ -101,7 +101,6 @@ class ThreadPool {
 
     condition_variable_any wait_cv;
   
-  
     /* ThreadPools are the type of thing that shouldn't be cloneable, since it's
     * not clear what it means to clone a ThreadPool (should copies of all outstanding
     * functions to be executed be copied?).

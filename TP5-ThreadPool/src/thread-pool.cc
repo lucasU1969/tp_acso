@@ -15,9 +15,9 @@ ThreadPool::ThreadPool(size_t numThreads) :
 {
     dt = thread([this]() {dispatcher();});                                                                      // lanzar el hilo dispatcher
     for (int worker_id = 0; worker_id < (int) numThreads; worker_id++) {
-        // lock_guard<mutex> lg(wts[worker_id].workerLock);
         wts[worker_id].ts = thread([this, worker_id]() {worker(worker_id);});                                   // lanzar los hilos worker
         wts[worker_id].is_available = true;
+        wts[worker_id].thunk = nullptr;
         available_workers_queue.push(worker_id);
     }
 }
@@ -31,59 +31,30 @@ void ThreadPool::schedule(const function<void(void)>& thunk) {                  
     task_count++;
 }
 
-void ThreadPool::dispatcher() {
-    while (true) {
-        function <void(void)> curr_thunk; 
-        {
-            lock_guard<mutex> lg(queueLock);
-            new_thunk_enqueued_cv.wait(queueLock, [this]() {return thunk_queue.size() > (size_t) 0 || done;});  // espero a que se encole una tarea o que done sea true
-            if (done) return;                                                                                   // si el wait funciona bien no puede pasar que haya tareas en la cola y que done sea true
-            curr_thunk = thunk_queue.front();                                                                       // obtengo el thunk que voy a asignar a un worker desocupado.
-            thunk_queue.pop();
-        }
-        
-        available_workers_semaphore.wait();                                                                     // espero a que algún hilo worker se desocupe.
-
-        int available_worker_id; 
-        available_workers_mutex.lock();
-        available_worker_id = available_workers_queue.front();                                                  // obtengo un id de worker disponible
-        available_workers_queue.pop(); 
-        available_workers_mutex.unlock();
-
-        wts[available_worker_id].workerLock.lock();
-        wts[available_worker_id].is_available = false;                                                          // marco como ocupado
-        wts[available_worker_id].thunk = curr_thunk;                                                            // le paso la tarea que tiene que ejecutar
-        wts[available_worker_id].availability_cv.notify_all();                                                  // lo despierto
-        wts[available_worker_id].workerLock.unlock();
-    }
-}
-
 void ThreadPool::worker(int id) {
     while (true) {
         function<void(void)> thunk_to_exec;
-        
         wts[id].workerLock.lock();
-        wts[id].availability_cv.wait(wts[id].workerLock, [this, id]() {return done || !wts[id].is_available;}); // mientras esté disponible espero
-        thunk_to_exec = wts[id].thunk;
+        while (!done && wts[id].thunk == nullptr) wts[id].availability_cv.wait(wts[id].workerLock);             // mientras no se haya llamado al destructor o mi thunk sea null espero
+        if (done) {
+            wts[id].workerLock.unlock();
+            return;
+        }
+        thunk_to_exec = wts[id].thunk;                                                                          // obtengo el thunk a ejecutar
+        wts[id].thunk = nullptr;
         wts[id].workerLock.unlock();
-        
-        if (done) return;
         
         thunk_to_exec();                                                                                        // ejecuto el thunk
         
-        wts[id].workerLock.lock();
-        wts[id].is_available = true;                                                                            // vuelvo a estar disponible
-        wts[id].workerLock.unlock();
-        
         available_workers_mutex.lock();
         available_workers_queue.push(id);                                                                       // me pusheo como worker disponible
-        available_workers_semaphore.signal();                                                                   // aviso que un worker terminó
+        available_workers_semaphore.signal();                                                                   // aviso para que se despierte dispatcher
         available_workers_mutex.unlock();
-
+        
         queueLock.lock();
-        task_count--;
+        task_count--;                                                                                           // menos tareas ejecutandose
         if (task_count == 0) {
-            wait_cv.notify_all();                                                                               // aviso a wait que ya no hay más tareas por ejecutar.
+            wait_cv.notify_all();                                                                               // aviso a wait que no quedan tareas
         }
         queueLock.unlock();
     }
@@ -91,12 +62,42 @@ void ThreadPool::worker(int id) {
 
 void ThreadPool::wait() {
     queueLock.lock();
-    wait_cv.wait(queueLock, [this]() {return task_count == 0;});
+    while (task_count != 0) wait_cv.wait(queueLock);
     queueLock.unlock();
 }
 
+void ThreadPool::dispatcher() {
+    while (true) {
+        function<void(void)> curr_thunk;
+        
+        queueLock.lock();
+        while (thunk_queue.empty() && !done) new_thunk_enqueued_cv.wait(queueLock);                             // espero mientras no llamen al destructor o la cola esté vacía
+        if (done && thunk_queue.empty()) {                                                                      // tengo que salir
+            queueLock.unlock();
+            return;
+        }
+
+        curr_thunk = thunk_queue.front();                                                                       // tarea a ejecutar
+        thunk_queue.pop();
+        queueLock.unlock();
+        
+        available_workers_semaphore.wait();                                                                     // espero a que haya un worker disponible
+        
+        int available_worker_id;
+        available_workers_mutex.lock();
+        available_worker_id = available_workers_queue.front();                                                  // veo el primer worker disponible
+        available_workers_queue.pop();
+        available_workers_mutex.unlock();
+        
+        wts[available_worker_id].workerLock.lock();
+        wts[available_worker_id].thunk = curr_thunk;                                                            // paso al tarea al worker seleccionado
+        wts[available_worker_id].availability_cv.notify_one();                                                  // le aviso
+        wts[available_worker_id].workerLock.unlock();
+    }
+}
+
 ThreadPool::~ThreadPool() {
-    wait(); 
+    wait();
 
     done = true;
     
@@ -107,7 +108,6 @@ ThreadPool::~ThreadPool() {
         wts[i].availability_cv.notify_all();                                                                    // notifico a todos los workers
     }
 
-    // esto podría no funcionar
     dt.join();                                                                                                  // libero los recursos del dispatcher 
     for (size_t i = 0; i < wts.size(); i++) wts[i].ts.join();                                                   // libero los recursos de los workers
 }
