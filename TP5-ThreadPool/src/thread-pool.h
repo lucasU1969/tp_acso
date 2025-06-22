@@ -16,6 +16,10 @@
 #include <vector>      // for vector
 #include "Semaphore.h" // for Semaphore
 
+#include <queue>
+#include <condition_variable>
+#include <atomic>
+
 using namespace std;
 
 
@@ -34,6 +38,11 @@ typedef struct worker {
     /**
      * Complete the definition of the worker_t struct here...
      **/
+
+    mutex workerLock;
+    bool is_available;
+    condition_variable_any availability_cv;
+
 } worker_t;
 
 class ThreadPool {
@@ -72,12 +81,26 @@ class ThreadPool {
     void dispatcher();
     thread dt;                              // dispatcher thread handle
     vector<worker_t> wts;                   // worker thread handles. you may want to change/remove this
-    bool done;                              // flag to indicate the pool is being destroyed
+    atomic<bool> done;                              // flag to indicate the pool is being destroyed
     mutex queueLock;                        // mutex to protect the queue of tasks
 
     /* It is incomplete, there should be more private variables to manage the structures... 
     * *
     */
+
+
+    queue <function<void(void)>> thunk_queue;             // cola de las tareas pasadas mediante schedule
+    condition_variable_any new_thunk_enqueued_cv;
+
+
+    queue <int> available_workers_queue;
+    Semaphore available_workers_semaphore;
+    mutex available_workers_mutex;
+
+    int task_count;
+
+    condition_variable_any wait_cv;
+  
   
     /* ThreadPools are the type of thing that shouldn't be cloneable, since it's
     * not clear what it means to clone a ThreadPool (should copies of all outstanding
